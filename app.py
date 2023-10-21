@@ -12,6 +12,7 @@ def get_current_hour_in_est():
     est_now = utc_now.astimezone(est)  
     return est_now.hour
 
+daily_data = []
 current_hour_est = get_current_hour_in_est()
 
 if not firebase_admin._apps:
@@ -82,35 +83,11 @@ select_parking_space = st.selectbox(f"**Please select a location in {selected_lo
 
 cri_deck_ref = parking_lots_ref.document(f'{select_parking_space}')
 cri_deck = cri_deck_ref.get()
-cri_deck_1 = parking_lots_ref.document(f'{select_parking_space}')
+
+cri_deck_1 = parking_lots_ref.document("CRI Deck")
 cri_deck_2 = cri_deck_1.get()
-
-def plot_graph():
-    st.markdown(f'<h4>Occupancy Trend (Today))</h4>', unsafe_allow_html=True)
-    trend = cri_deck_2.get("weeklyData")[0]
-    sorted_data = {k: trend[k] for k in sorted(trend, key=int)}
+cri_deck_dict = cri_deck_2 .to_dict()
     
-    daily_data = []
-    hours = []
-
-    for key, item in sorted_data.items():
-        percentage_calculate = int((total_lots - item)/total_lots * 100)
-        daily_data.append(percentage_calculate)
-        hours.append(f"{key}:0")
-
-    plt.figure(figsize=(12,6))
-    bars = plt.bar(hours, daily_data, color='lightgray')
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.ylim(0, 100) 
-   
-    current_hour = current_hour_est
-    bars[current_hour].set_color('salmon')
-
-    plt.gca().spines['right'].set_visible(False)
-    plt.gca().spines['left'].set_visible(False)
-    plt.gca().spines['top'].set_visible(False)
-
-    st.pyplot(plt)
 if cri_deck.exists:
     deck_dict = cri_deck.to_dict()
     total_lots = deck_dict.get("totalLots")
@@ -133,17 +110,43 @@ if cri_deck.exists:
     st.markdown(f'<h4>Address: {deck_dict.get("address")}</h4>', unsafe_allow_html=True)
     link = deck_dict.get("direction")
     st.markdown(f'<a href="{link}" target="_blank" class="direction_button">Direction</a>', unsafe_allow_html=True) 
-    total_percentage = int((total_lots - available_spaces)/total_lots * 100)
-    st.markdown(f'<h4>Live Occupancy Percentage: {total_percentage}% </h4>', unsafe_allow_html=True)
-    st.progress(total_percentage, "")
     
-    plot_graph()
+    # total_percentage = int((total_lots - available_spaces)/total_lots * 100)
+    trend = cri_deck_dict.get("weeklyData")[0]
+    sorted_data = {k: trend[k] for k in sorted(trend, key=int)}
+    
+    daily_data = []
+    hours = []
+
+    for key, item in sorted_data.items():
+        percentage_calculate = int((total_lots - item)/total_lots * 100)
+        daily_data.append(percentage_calculate)
+        hours.append(f"{key}:0")
+    
+    current_hour = current_hour_est
+    st.markdown(f'<h4>Live Occupancy Percentage: {daily_data[current_hour]}% </h4>', unsafe_allow_html=True)
+    st.progress(daily_data[current_hour], "")
+    
+    st.markdown(f'<h4>Occupancy Trend (Today))</h4>', unsafe_allow_html=True)
+
+    plt.figure(figsize=(12,6))
+    bars = plt.bar(hours, daily_data, color='lightgray')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.ylim(0, 100) 
+    
+    bars[current_hour].set_color('salmon')
+
+    plt.gca().spines['right'].set_visible(False)
+    plt.gca().spines['left'].set_visible(False)
+    plt.gca().spines['top'].set_visible(False)
+
+    st.pyplot(plt)
     
     if daily_data[current_hour]  > 90:
         st.markdown(f'<h4 style="text-align: center; color: salmon;">Low availability here. Try other deck.</h4>', unsafe_allow_html=True)
-        st.markdown(f'<h4>Parking Locations Near:  {deck_dict.get("nearLocation")}</h4>', unsafe_allow_html=True)
-        
-     
+    
+    st.markdown(f'<h4>Other Parking Locations Near:  {deck_dict.get("nearLocation")}</h4>', unsafe_allow_html=True)
+
 else:
     st.write("No document found with the name 'CRI Deck'")
 
